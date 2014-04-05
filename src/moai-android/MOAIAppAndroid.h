@@ -42,7 +42,8 @@ private:
 	static int	_sendMail			( lua_State* L );
 	static int	_setListener		( lua_State* L );
 	static int	_share				( lua_State* L );
-
+	static int	_getTimer			( lua_State* L );
+	static int	_setTimer			( lua_State* L );
 
 	// ## CAMERA SUPPORT
 	static int _takePicture		( lua_State* L );
