@@ -203,13 +203,13 @@ int MOAIAppAndroid::_getTimer ( lua_State* L ) {
 	jclass moai = env->FindClass ( "com/ziplinegames/moai/Moai" );
     if ( moai == NULL ) {
 
-		USLog::Print ( "MOAIAppAndroid: Unable to find java class %s", "com/ziplinegames/moai/Moai" );
+		ZLLog::Print ( "MOAIAppAndroid: Unable to find java class %s", "com/ziplinegames/moai/Moai" );
     } else {
 
     	jmethodID getTimer = env->GetStaticMethodID ( moai, "getTimer", "(Ljava/lang/String;)I" );
     	if ( getTimer == NULL ) {
 
-			USLog::Print ( "MOAIAppAndroid: Unable to find static java method %s", "getTimer" );
+			ZLLog::Print ( "MOAIAppAndroid: Unable to find static java method %s", "getTimer" );
     	} else {
 
 			outVal = env->CallStaticIntMethod ( moai, getTimer, jid );	
@@ -243,13 +243,13 @@ int MOAIAppAndroid::_setTimer ( lua_State* L ) {
 	jclass moai = env->FindClass ( "com/ziplinegames/moai/Moai" );
     if ( moai == NULL ) {
 
-		USLog::Print ( "MOAIAppAndroid: Unable to find java class %s", "com/ziplinegames/moai/Moai" );
+		ZLLog::Print ( "MOAIAppAndroid: Unable to find java class %s", "com/ziplinegames/moai/Moai" );
     } else {
 
     	jmethodID setTimer = env->GetStaticMethodID ( moai, "setTimer", "(Ljava/lang/String;I)V" );
     	if ( setTimer == NULL ) {
 
-			USLog::Print ( "MOAIAppAndroid: Unable to find static java method %s", "setTimer" );
+			ZLLog::Print ( "MOAIAppAndroid: Unable to find static java method %s", "setTimer" );
     	} else {
 
 			env->CallStaticVoidMethod ( moai, setTimer, jid, value );	
