@@ -95,10 +95,10 @@ void MOAITouchSensor::HandleEvent ( ZLStream& eventStream ) {
 				
 				MOAIScopedLuaState state = this->mCallback.GetSelf ();
 				lua_pushnumber ( state, eventType );
-				lua_pushnumber ( state, idx );
-				lua_pushnumber ( state, touch.mX );
-				lua_pushnumber ( state, touch.mY );
-				lua_pushnumber ( state, touch.mTapCount );
+				lua_pushnumber ( state, touchID );
+				lua_pushnumber ( state, x );
+				lua_pushnumber ( state, y );
+				lua_pushnumber ( state, 1 );
 				state.DebugCall ( 5, 0 );
 			}
 		}
