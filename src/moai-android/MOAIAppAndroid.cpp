@@ -319,6 +319,8 @@ void MOAIAppAndroid::RegisterLuaClass ( MOAILuaState& state ) {
 		{ "sendMail",				_sendMail },
 		{ "setListener",			_setListener },
 		{ "share",					_share },
+		{ "getTimer",				_getTimer },
+		{ "setTimer",					_setTimer },
         { "takePicture",            _takePicture },
         { "getPictureCode",			_getPictureCode },
         { "getPicturePath",			_getPicturePath },
