@@ -29,6 +29,7 @@ import android.view.Display;
 import android.view.KeyEvent;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.LinearLayout;
 
 // Moai
 import com.ziplinegames.moai.*;
@@ -47,7 +48,7 @@ import android.provider.Settings.Secure;
 public class MoaiActivity extends Activity {
 
 	private AccelerometerEventListener		mAccelerometerListener = null;
-	private Sensor 							mAccelerometerSensor = null;
+	private Sensor							mAccelerometerSensor = null;
 	private Sensor							mMagnetometerSensor = null;
 	private LocationEventListener			mLocationListener = null;
 	private ConnectivityBroadcastReceiver 	mConnectivityReceiver = null;
@@ -69,33 +70,34 @@ public class MoaiActivity extends Activity {
 	//----------------------------------------------------------------//
     public void onActivityResult ( int requestCode, int resultCode, Intent data ) {
 	
-        super.onActivityResult ( requestCode, resultCode, data );
+		super.onActivityResult ( requestCode, resultCode, data );
 		Moai.onActivityResult ( requestCode, resultCode, data );
     }
 
-   	//----------------------------------------------------------------//
-    protected void onCreate ( Bundle savedInstanceState ) {
+	//----------------------------------------------------------------//
+	protected void onCreate ( Bundle savedInstanceState ) {
 
 		MoaiLog.i ( "MoaiActivity onCreate: activity CREATED" );
 
 		mAccelerometerData = new float[3];
 		
-    	super.onCreate ( savedInstanceState );
+		requestWindowFeature ( Window.FEATURE_NO_TITLE );
+		super.onCreate ( savedInstanceState );
 		Moai.onCreate ( this );
 		
 		Moai.createContext ();
 		Moai.init ();
 		
-        requestWindowFeature ( Window.FEATURE_NO_TITLE );
-	    getWindow ().addFlags ( WindowManager.LayoutParams.FLAG_FULLSCREEN );
-	    //getWindow ().addFlags ( WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON );
+		getWindow ().addFlags ( WindowManager.LayoutParams.FLAG_FULLSCREEN );
+		getWindow ().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+		//getWindow ().addFlags ( WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON );
 
 		try {
 			
 			ApplicationInfo myApp = getPackageManager ().getApplicationInfo ( getPackageName (), 0 );
 
-			Moai.mount ( "bundle", myApp.publicSourceDir );
-			Moai.setWorkingDirectory ( "bundle/assets/@WORKING_DIR@" );				
+			Moai.mount ( "bundle", myApp.sourceDir );
+			Moai.setWorkingDirectory ( "bundle/assets/@WORKING_DIR@" );
 		} catch ( NameNotFoundException e ) {
 
 			MoaiLog.e ( "MoaiActivity onCreate: Unable to locate the application bundle" );
@@ -108,7 +110,15 @@ public class MoaiActivity extends Activity {
 
 			MoaiLog.e ( "MoaiActivity onCreate: Unable to set the document directory" );
 		}
-				
+		
+		if (  getCacheDir () != null ) {
+		 
+		 	Moai.setCacheDirectory ( getCacheDir ().getAbsolutePath ());
+		} else {
+
+			MoaiLog.e ( "MoaiActivity onCreate: Unable to set the cache directory" );
+		}
+		
 		Display display = (( WindowManager ) getSystemService ( Context.WINDOW_SERVICE )).getDefaultDisplay ();
 		ConfigurationInfo info = (( ActivityManager ) getSystemService ( Context.ACTIVITY_SERVICE )).getDeviceConfigurationInfo ();
 
@@ -120,9 +130,13 @@ public class MoaiActivity extends Activity {
 		startConnectivityReceiver ();
 		enableAccelerometerEvents ( false );
 		enableLocationEvents ( false );
-
-		setContentView ( mMoaiView );
-    }
+		
+		LinearLayoutIMETrap con = MoaiKeyboard.getContainer ();
+		setContentView ( con );
+		con.addView ( mMoaiView );
+		con.addView ( MoaiKeyboard.getEditText ());
+		
+	}
 
 	//----------------------------------------------------------------//
 	protected void onDestroy () {
@@ -142,6 +156,10 @@ public class MoaiActivity extends Activity {
 		
 		MoaiLog.i ( "MoaiActivity onNewIntent: application started from NEW INTENT" );
 		
+		Uri data = intent.getData();
+		if (data != null) {
+			Moai.AppOpenedFromURL ( data.toString() );
+		}
 		setIntent ( intent );
 	}
 
@@ -312,15 +330,15 @@ public class MoaiActivity extends Activity {
 	//----------------------------------------------------------------//
 	public boolean onKeyDown ( int keyCode, KeyEvent event ) {
 
-	    if ( keyCode == KeyEvent.KEYCODE_BACK ) {
+		MoaiLog.i ("MoaiActivity onKeyDown, keycode " + keyCode + " event: " + event );
+		if ( keyCode == KeyEvent.KEYCODE_BACK ) {
 	        
 			if ( Moai.backButtonPressed ()) {
 				
 				return true;
 			}
-	    }
-	    
-	    return super.onKeyDown ( keyCode, event );
+		}
+		return super.onKeyDown ( keyCode, event );
 	}
 	
 	//================================================================//
@@ -360,24 +378,20 @@ public class MoaiActivity extends Activity {
 			
 			ConnectivityManager manager = ( ConnectivityManager )context.getSystemService ( Context.CONNECTIVITY_SERVICE );
 			NetworkInfo networkInfo = manager.getActiveNetworkInfo ();
-					
 			Moai.ConnectionType connectionType = Moai.ConnectionType.CONNECTION_NONE;
-					
+			
 			if ( networkInfo != null ) {
 				
 				 switch ( networkInfo.getType () ) {
-					 								
-				 	case ConnectivityManager.TYPE_MOBILE: {
-					
-				 		connectionType = Moai.ConnectionType.CONNECTION_WWAN;
-				 		break;
-				 	}
-					 									
-				 	case ConnectivityManager.TYPE_WIFI: {
-					
-				 		connectionType = Moai.ConnectionType.CONNECTION_WIFI;
-				 		break;
-				 	}
+				 
+					case ConnectivityManager.TYPE_MOBILE: {
+						connectionType = Moai.ConnectionType.CONNECTION_WWAN;
+						break;
+					}
+					case ConnectivityManager.TYPE_WIFI: {
+						connectionType = Moai.ConnectionType.CONNECTION_WIFI;
+						break;
+					}
 				 }
 			}
 			
@@ -425,22 +439,22 @@ public class MoaiActivity extends Activity {
 			if ( event.sensor.getType () == Sensor.TYPE_ACCELEROMETER ) {
 
 				Display display = (( WindowManager ) getSystemService ( Context.WINDOW_SERVICE )).getDefaultDisplay ();
-                canonicalOrientationToScreenOrientation ( display.getRotation (), event.values, mAccelerometerData );
+				canonicalOrientationToScreenOrientation ( display.getRotation (), event.values, mAccelerometerData );
                 
-                float x = mAccelerometerData [ 0 ];
-                float y = mAccelerometerData [ 1 ];
-                float z = mAccelerometerData [ 2 ];
+				float x = mAccelerometerData [ 0 ];
+				float y = mAccelerometerData [ 1 ];
+				float z = mAccelerometerData [ 2 ];
                 
 				mGravity = mAccelerometerData;
 
 				int deviceId = Moai.InputDevice.INPUT_DEVICE.ordinal ();
 				int sensorId = Moai.InputSensor.SENSOR_LEVEL.ordinal ();
                 
-                // normalize the vector
-                double mag = Math.sqrt ( x * x + y * y + z * z );
-                x = x / ( float ) mag;
-                y = y / ( float ) mag;
-                z = z / ( float ) mag;
+				// normalize the vector
+				double mag = Math.sqrt ( x * x + y * y + z * z );
+				x = x / ( float ) mag;
+				y = y / ( float ) mag;
+				z = z / ( float ) mag;
 
 				Moai.enqueueLevelEvent ( deviceId, sensorId, x, y, z );
 			}

@@ -96,6 +96,7 @@
 	}
 	
 	fr $out_dir/project/res/values/strings.xml @NAME@ "$app_name"
+	fr $out_dir/project/res/values/strings.xml @APP_ID@ "$app_id"
 	
 	cp -f host-source/project/.project $out_dir/project/.project 
 	fr $out_dir/project/.project @NAME@ "$project_name"
@@ -166,6 +167,7 @@
 	done
 	
 	fr $out_dir/project/AndroidManifest.xml	@PACKAGE@ "$package"
+	fr $out_dir/project/AndroidManifest.xml	@SCREEN_ORIENTATION@ "$screenOrientation"
 	
 	cp -f host-source/project/local.properties $out_dir/project/local.properties
 	for file in `find $out_dir/ -name "local.properties"` ; do fr $file @SDK_ROOT@ "$android_sdk_root" ; done
@@ -178,13 +180,16 @@
 	working_dir_depth=`grep -o "\/" <<<"$working_dir" | wc -l`
 	(( working_dir_depth += 1 ))
 	
-	for (( i=1; i<=$working_dir_depth; i++ )); do
-		if [ $i == 1 ]; then
-			init_dir=\.\.
-		else
-			init_dir=$init_dir\/\.\.
-		fi
-	done
+	init_dir=\.
+    if [ x$working_dir != x"." ]; then
+        for (( i=1; i<=$working_dir_depth; i++ )); do
+            if [ $i == 1 ]; then
+                init_dir=\.\.
+            else
+                init_dir=$init_dir\/\.\.
+            fi
+        done
+    fi
 	
 	run_command="\"$init_dir/init.lua\""
 	
@@ -205,8 +210,17 @@
 			source_dir=$local_root/$source_dir
 		fi
 		pushd $source_dir > /dev/null
-			find . -name ".?*" -type d -prune -o -name "*.sh" -type f -prune -o -name "*.bat" -type f -prune -o -type f -print0 | cpio -pmd0 --quiet $out_dir/project/assets/${dest_dirs[$i]}
+			find -L . -name ".?*" -type d -prune -o -name "*.sh" -type f -prune -o -name "*.bat" -type f -prune -o -type f -print0 | cpio -pmd0 --quiet $out_dir/project/assets/${dest_dirs[$i]}
 		popd > /dev/null
+	done
+
+    # Copy Assets
+    for (( i=0; i<${#asset_dirs[@]}; i++ )); do
+		asset_dir=${asset_dirs[$i]}
+		if [ x"$asset_dir" != x ] && [ x"$local_root" != x ] && [[ ! $asset_dir == /* ]]; then
+			asset_dir=$local_root/$asset_dir
+		fi
+        cp -R $asset_dir $out_dir/project/assets/
 	done
 
 	if [ "$debug" == "true" ]; then
