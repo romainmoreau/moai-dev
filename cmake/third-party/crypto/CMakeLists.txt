@@ -3,7 +3,7 @@ project ( crypto )
 
 
 
-  set ( CMAKE_CURRENT_SOURCE_DIR "${MOAI_ROOT}/3rdparty/openssl-1.0.0d/crypto/" )
+  set ( CMAKE_CURRENT_SOURCE_DIR "${MOAI_ROOT}/3rdparty/openssl-1.0.0m/crypto/" )
 
   #set ( CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -DOPENSSL_NO_ASM" )
   set ( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DL_ENDIAN -DOPENSSL_NO_ASM  -DOPENSSL_NO_RC5 -DOPENSSL_NO_MD2 -DOPENSSL_NO_KRB5 -DOPENSSL_NO_JPAKE -DOPENSSL_NO_STATIC_ENGINE "  )
@@ -11,11 +11,11 @@ project ( crypto )
   SET_SOURCE_FILES_PROPERTIES( . PROPERTIES LANGUAGE CXX )
 
   set ( CRYPTO_INCLUDES 
-    "${MOAI_ROOT}/3rdparty/openssl-1.0.0d/crypto/"
-    "${MOAI_ROOT}/3rdparty/openssl-1.0.0d/include/"
-    "${MOAI_ROOT}/3rdparty/openssl-1.0.0d/crypto/asn1/"
-    "${MOAI_ROOT}/3rdparty/openssl-1.0.0d/crypto/evp/"
-    "${MOAI_ROOT}/3rdparty/openssl-1.0.0d/" 
+    "${MOAI_ROOT}/3rdparty/openssl-1.0.0m/crypto/"
+    "${MOAI_ROOT}/3rdparty/openssl-1.0.0m/include/"
+    "${MOAI_ROOT}/3rdparty/openssl-1.0.0m/crypto/asn1/"
+    "${MOAI_ROOT}/3rdparty/openssl-1.0.0m/crypto/evp/"
+    "${MOAI_ROOT}/3rdparty/openssl-1.0.0m/" 
    )
 
     if ( BUILD_OSX )
@@ -51,13 +51,13 @@ project ( crypto )
 
     if (BUILD_WINDOWS AND NOT MSVC)
         set( CRYPTO_INCLUDES
-                "${MOAI_ROOT}/3rdparty/openssl-1.0.0d/${PLATFORM_INCLUDE}"
+                "${MOAI_ROOT}/3rdparty/openssl-1.0.0m/${PLATFORM_INCLUDE}"
                  ${CRYPTO_INCLUDES}
        )
     else ()
         set( CRYPTO_INCLUDES
                 ${CRYPTO_INCLUDES}
-                "${MOAI_ROOT}/3rdparty/openssl-1.0.0d/${PLATFORM_INCLUDE}"
+                "${MOAI_ROOT}/3rdparty/openssl-1.0.0m/${PLATFORM_INCLUDE}"
        )
     endif (BUILD_WINDOWS AND NOT MSVC)
 
