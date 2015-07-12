@@ -10,6 +10,10 @@
 #include "SystemData.h"
 #include "SoundData.h"
 
+#ifdef __QNX__
+#include <string.h>
+#endif
+
 using namespace UNTZ;
 
 
@@ -108,9 +112,12 @@ int AudioMixer::process(UInt32 numInputChannels, float* inputBuffer, UInt32 numO
 			}
 			while(framesRead > 0 && totalFramesRead < numFrames);
             
-			if(framesRead == 0)
+			if(framesRead <= 0)
             {
-				s->stop();
+                if ( ! s->isLooping() )
+                {
+				    s->stop();
+                }
             }
 		}
 	}
