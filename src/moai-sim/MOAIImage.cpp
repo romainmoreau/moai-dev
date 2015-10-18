@@ -9,6 +9,7 @@
 
 #include <moai-sim/MOAIImage.h>
 #include <moai-sim/MOAIImageFormatMgr.h>
+#include <moai-sim/MOAIImageLoadTask.h>
 #include <moai-sim/MOAIGfxDevice.h>
 #include <float.h>
 #include <contrib/edtaa3func.h>
@@ -18,7 +19,15 @@
 //================================================================//
 
 //----------------------------------------------------------------//
-// TODO: doxygen
+/**	@lua	average
+	@text	Calculates the average of each color channel.
+
+	@in		MOAIImage self
+	@out	number averageR
+	@out	number averageG
+	@out	number averageB
+	@out	number averageA
+*/
 int MOAIImage::_average ( lua_State* L ) {
 	MOAI_LUA_SETUP ( MOAIImage, "U" )
 	
@@ -54,6 +63,23 @@ int MOAIImage::_bleedRect ( lua_State* L ) {
 	rect.mYMax	= state.GetValue < int >( 5, 0 );
 	
 	self->BleedRect ( rect );
+	
+	return 0;
+}
+
+//----------------------------------------------------------------//
+/**	@lua	blur
+	@text	Fast gaussian blur (approximated with box blur)
+ 	
+	@in		MOAIImage   self
+	@out	nil
+*/
+int MOAIImage::_blur ( lua_State *L ) {
+	MOAI_LUA_SETUP ( MOAIImage, "U" )
+	
+	// TODO: better implementation with support for radius and sigma.
+	// 		 Current is rather an ad-hoc one with r = 5
+	self->Blur ();
 	
 	return 0;
 }
@@ -176,6 +202,9 @@ int MOAIImage::_copyBits ( lua_State* L ) {
 	@opt	number destYMax		Default value is destYMin + srcYMax - srcYMin;
 	@opt	number filter		One of MOAIImage.FILTER_LINEAR, MOAIImage.FILTER_NEAREST.
 								Default value is MOAIImage.FILTER_LINEAR.
+	@opt	number srcFactor	Default value is BLEND_FACTOR_SRC_ALPHA
+	@opt	number dstFactor	Default value is BLEND_FACTOR_ONE_MINUS_SRC_ALPHA
+	@opt	number equation		Default value is BLEND_EQ_ADD
 	@out	nil
 */
 int MOAIImage::_copyRect ( lua_State* L ) {
@@ -264,6 +293,33 @@ int MOAIImage::_fillCircle ( lua_State* L ) {
 }
 
 //----------------------------------------------------------------//
+/**	@lua	fillEllipse
+	@text	Draw a filled ellipse.
+ 
+	@in		number x
+	@in		number y
+	@in		number radiusX
+	@in		number radiusY
+	@opt	number r			Default value is 0.
+	@opt	number g			Default value is 0.
+	@opt	number b			Default value is 0.
+	@opt	number a			Default value is 0.
+	@out	nil
+*/
+int MOAIImage::_fillEllipse ( lua_State* L ) {
+	MOAI_LUA_SETUP ( MOAIImage, "UNNNN" )
+	
+	int x0	= state.GetValue < int >( 2, 0 );
+	int y0	= state.GetValue < int >( 3, 0 );
+	int rX	= state.GetValue < int >( 4, 0 );
+	int rY	= state.GetValue < int >( 5, 0 );
+	u32 color	= state.GetColor32 ( 6, 0.0f, 0.0f, 0.0f, 0.0f );
+	
+	self->FillEllipse ( x0, y0, rX, rY, color );
+	return 0;
+}
+
+//----------------------------------------------------------------//
 /**	@lua	fillRect
 	@text	Fill a rectangle in the image with a solid color.
 
@@ -294,7 +350,7 @@ int MOAIImage::_fillRect ( lua_State* L ) {
 	@text	Apply gamma correction.
 
 	@in		MOAIImage self
-	@opt	gamma			Default value is 1.
+	@opt	number gamma			Default value is 1.
 	@out	nil
 */
 int MOAIImage::_gammaCorrection ( lua_State* L ) {
@@ -373,7 +429,7 @@ int MOAIImage::_generateSDF( lua_State* L ) {
 	@in		number yMin
 	@in		number xMax
 	@in		number yMax
-	@opt	number threshold default is 0.2
+	@opt	number threshold	Default is 0.2
 	@out	nil
 */
 int MOAIImage::_generateSDFAA ( lua_State* L ) {
@@ -397,7 +453,7 @@ int MOAIImage::_generateSDFAA ( lua_State* L ) {
 	@in		number yMin
 	@in		number xMax
 	@in		number yMax
-	@opt	number threshold default is 256
+	@opt	number threshold	Default is 256
 	@out	nil
 */
 int MOAIImage::_generateSDFDeadReckoning( lua_State* L ) {
@@ -562,6 +618,54 @@ int MOAIImage::_load ( lua_State* L ) {
 }
 
 //----------------------------------------------------------------//
+/**	@lua	loadAsync
+	@text	Load an image asyncronously. This includes reading the file and decoding compressed data.
+	
+ 	@overload
+		@in		MOAIImage self
+		@in		string filename			The path to the image file
+		@in		MOAITaskQueue queue		The queue to peform operation on
+		@opt	function callback		Callback that will receive loaded image
+		@opt	number transform		One of MOAIImage.POW_TWO, MOAIImage.QUANTIZE,
+										MOAIImage.TRUECOLOR, MOAIImage.PREMULTIPLY_ALPHA
+		@out	nil
+ 
+	@overload
+		@in		MOAIImage self
+		@in		MOAIDataBuffer data		Buffer containing the image data
+		@in		MOAITaskQueue queue		The queue to peform operation on
+		@opt	function callback		Callback that will receive loaded image
+		@opt	number transform		One of MOAIImage.POW_TWO, MOAIImage.QUANTIZE,
+										MOAIImage.TRUECOLOR, MOAIImage.PREMULTIPLY_ALPHA
+		@out	nil
+*/
+int MOAIImage::_loadAsync ( lua_State *L ) {
+	MOAI_LUA_SETUP ( MOAIImage, "U" )
+	
+	MOAIDataBuffer* buffer	= state.GetLuaObject < MOAIDataBuffer >( 2, false );
+	MOAITaskQueue* queue	= state.GetLuaObject < MOAITaskQueue >( 3, true );
+	u32 transform			= state.GetValue < u32 >( 5, 0 );
+	
+	if ( !queue ) {
+		return 0;
+	}
+	
+	MOAIImageLoadTask* task = new MOAIImageLoadTask ();
+	
+	if ( buffer ) {
+		task->Init ( *buffer, *self, transform );
+	}
+	else {
+		cc8* filename = state.GetValue < cc8* >( 2, "" );
+		task->Init ( filename, *self, transform );
+	}
+	task->SetCallback ( L, 4 );
+	task->Start ( *queue, MOAIMainThreadTaskSubscriber::Get ());
+	
+	return 0;
+}
+
+//----------------------------------------------------------------//
 /**	@lua	loadFromBuffer
 	@text	Loads an image from a buffer.
 
@@ -608,11 +712,23 @@ int MOAIImage::_loadFromBuffer ( lua_State* L ) {
 			may be rearranged or blended.
 	
 	@in		MOAIImage self
-	@opt	r1, r2, r3, r4
-	@opt	g1, g2, g3, g4
-	@opt	b1, b2, b3, b4
-	@opt	a1, a2, a3, a4
-	@opt	K					Default value is 1.
+	@opt	number r1
+	@opt	number r2
+	@opt	number r3
+	@opt	number r4
+	@opt	number g1
+	@opt	number g2
+	@opt	number g3
+	@opt	number g4
+	@opt	number b1
+	@opt	number b2
+	@opt	number b3
+	@opt	number b4
+	@opt	number a1
+	@opt	number a2
+	@opt	number a3
+	@opt	number a4
+	@opt	number K					Default value is 1.
 	@out	nil
 */
 int MOAIImage::_mix ( lua_State* L ) {
@@ -1051,6 +1167,67 @@ void MOAIImage::Blit ( const MOAIImage& image, int srcX, int srcY, int destX, in
 		void* destRow = this->GetRowAddr ( y + destY );
 		
 		ZLBitBuffer::Blit ( destRow, destX, srcRow, srcX, width, pixelDepth );
+	}
+}
+
+//----------------------------------------------------------------//
+static int reflect( int M, int x ) {
+	
+	if ( x < 0 ) {
+		return -x - 1;
+	}
+	if ( x >= M ) {
+		return 2 * M - x - 1;
+	}
+	return x;
+}
+
+//----------------------------------------------------------------//
+void MOAIImage::Blur () {
+	
+	MOAIImage image;
+	image.Copy ( *this );
+	
+	ZLColorVec sum, color;
+	int x1, y1;
+	
+	// coefficients of 1D gaussian kernel with sigma = 1
+	float coeffs [] = { 0.0545, 0.2442, 0.4026, 0.2442, 0.0545 };
+//    float coeffs [] = { 0.006, 0.061, 0.242, 0.383, 0.242, 0.061, 0.006 };
+	int r = 2;
+	
+	// along y - direction
+	for ( int y = 0; y < this->mHeight; y++ ) {
+		for ( int x = 0; x < this->mWidth; x++ ) {
+			sum.SetRGBA ( 0 );
+			for ( int i = -r; i <= r; i++ ) {
+				y1 = reflect ( this->mHeight, y - i );
+				color.SetRGBA ( this->GetColor ( x, y1 ));
+				color.mA *= coeffs [ i + r ];
+				color.mR *= coeffs [ i + r ];
+				color.mG *= coeffs [ i + r ];
+				color.mB *= coeffs [ i + r ];
+				sum.Add ( color );
+			}
+			image.SetColor ( x, y, sum.PackRGBA ());
+		}
+	}
+	
+	// along x - direction
+	for ( int y = 0; y < this->mHeight; y++ ) {
+		for ( int x = 0; x < this->mWidth; x++ ) {
+			sum.SetRGBA ( 0 );
+			for ( int i = -r; i <= r; i++ ) {
+				x1 = reflect ( this->mWidth, x - i );
+				color.SetRGBA ( image.GetColor ( x1, y ));
+				color.mA *= coeffs [ i + r ];
+				color.mR *= coeffs [ i + r ];
+				color.mG *= coeffs [ i + r ];
+				color.mB *= coeffs [ i + r ];
+				sum.Add ( color );
+			}
+			this->SetColor ( x, y, sum.PackRGBA ());
+		}
 	}
 }
 
@@ -1725,6 +1902,62 @@ void MOAIImage::FillCircle ( float centerX, float centerY, float xRad, u32 color
 }
 
 //----------------------------------------------------------------//
+void MOAIImage::FillEllipse ( int centerX, int centerY, int xRad, int yRad, u32 color ) {
+	
+	int x0 = centerX;
+	int y0 = centerY;
+	s64 err = 0;
+	s64 aa2 = 2 * xRad * xRad;
+	s64 bb2 = 2 * yRad * yRad;
+	s64 x = xRad;
+	s64 y = 0;
+	s64 stopX = bb2 * xRad;
+	s64 stopY = 0;
+	s64 dx = yRad * yRad * ( 1 - 2 * xRad );
+	s64 dy = xRad * xRad;
+	
+	while ( stopX >= stopY ) {
+		this->DrawLine ( x0 - x, y0 + y, x0 + x, y0 + y, color );
+		this->DrawLine ( x0 - x, y0 - y, x0 + x, y0 - y, color );
+		
+		y++;
+		stopY += aa2;
+		err += dy;
+		dy += aa2;
+		
+		if ( 2 * err + dx > 0 ) {
+			x--;
+			stopX -= bb2;
+			err += dx;
+			dx += bb2;
+		}
+	}
+	
+	x = 0;
+	y = yRad;
+	dx = yRad * yRad;
+	dy = xRad * xRad * ( 1 - 2 * yRad );
+	err = 0;
+	stopX = 0;
+	stopY = aa2 * yRad;
+	while ( stopX <= stopY ) {
+		
+		this->DrawLine ( x0 - x, y0 + y, x0 + x, y0 + y, color );
+		this->DrawLine ( x0 - x, y0 - y, x0 + x, y0 - y, color );
+		x++;
+		stopX += bb2;
+		err += dx;
+		dx += bb2;
+		if ( 2 * err + dy > 0 ) {
+			y--;
+			stopY -= aa2;
+			err += dy;
+			dy += aa2;
+		}
+	}
+}
+
+//----------------------------------------------------------------//
 void MOAIImage::FillRect ( ZLIntRect rect, u32 color ) {
 
 	if ( !color ) {
@@ -1780,6 +2013,9 @@ void MOAIImage::GenerateOutlineFromSDF ( ZLIntRect rect, float distMin, float di
 				colorVec.mA = a;
 			}
 			else {
+				colorVec.mR = 1;
+				colorVec.mG = 1;
+				colorVec.mB = 1;
 				colorVec.mA = 0;
 			}
 			
@@ -2284,7 +2520,7 @@ bool MOAIImage::Load ( cc8* filename, u32 transform ) {
 		this->OnImageStatusChanged ( this->IsOK ());
 	}
 	else {
-		MOAILog ( NULL, MOAILogMessages::MOAI_FileOpenError_S, filename );
+		MOAILogF ( NULL, ZLLog::LOG_ERROR, MOAILogMessages::MOAI_FileOpenError_S, filename );
 	}
 	return this->IsOK ();
 }
@@ -2493,6 +2729,7 @@ void MOAIImage::RegisterLuaFuncs ( MOAILuaState& state ) {
 	luaL_Reg regTable [] = {
 		{ "average",					_average },
 		{ "bleedRect",					_bleedRect },
+		{ "blur",						_blur },
 		{ "compare",					_compare },
 		{ "convert",					_convert },
 		{ "convertColors",				_convert }, // back compat
@@ -2502,7 +2739,9 @@ void MOAIImage::RegisterLuaFuncs ( MOAILuaState& state ) {
 		{ "copyRect",					_copyRect },
 		{ "desaturate",					_desaturate },
 		{ "fillCircle",					_fillCircle },
+		{ "fillEllipse",				_fillEllipse },
 		{ "fillRect",					_fillRect },
+		{ "gammaCorrection",			_gammaCorrection },
 		{ "generateOutlineFromSDF",		_generateOutlineFromSDF },
 		{ "generateSDF",				_generateSDF },
 		{ "generateSDFAA",				_generateSDFAA },
@@ -2513,6 +2752,7 @@ void MOAIImage::RegisterLuaFuncs ( MOAILuaState& state ) {
 		{ "getSize",					_getSize },
 		{ "init",						_init },
 		{ "load",						_load },
+		{ "loadAsync",					_loadAsync },
 		{ "loadFromBuffer",				_loadFromBuffer },
 		{ "mix",						_mix },
 		{ "padToPow2",					_padToPow2 },
@@ -2607,7 +2847,7 @@ void MOAIImage::ResizeCanvas ( const MOAIImage& image, ZLIntRect rect ) {
 }
 
 //----------------------------------------------------------------//
-u32 MOAIImage::SampleColor ( float x, float y, u32 filter ) const {
+u32 MOAIImage::SampleColor ( float x, float y, u32 filter, bool wrapX, bool wrapY ) const {
 
 	u32 x0 = ( u32 )floorf ( x );
 	u32 y0 = ( u32 )floorf ( y );
@@ -2616,11 +2856,11 @@ u32 MOAIImage::SampleColor ( float x, float y, u32 filter ) const {
 	u32 y1 = y0 + 1;
 	
 	if ( x1 >= this->mWidth ) {
-		x1 = this->mWidth - 1;
+		x1 = wrapX ? x1 % this->mWidth : this->mWidth - 1;
 	}
 	
 	if ( y1 >= this->mHeight ) {
-		y1 = this->mHeight - 1;
+		y1 = wrapY ? y1 % this->mHeight : this->mHeight - 1;
 	}
 	
 	u32 c0 = this->GetColor ( x0, y0 );
@@ -2730,6 +2970,8 @@ void MOAIImage::Take ( MOAIImage& image ) {
 	
 	this->mBitmap		= image.mBitmap;
 	this->mPalette		= image.mPalette;
+
+	this->OnImageStatusChanged ( true );
 
 	// kill the data before clear
 	image.mBitmap = 0;
